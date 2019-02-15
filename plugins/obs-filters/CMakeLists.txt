@@ -36,6 +36,7 @@ endif()
 set(obs-filters_SOURCES
 	obs-filters.c
 	color-correction-filter.c
+	color-inverse.c
 	async-delay-filter.c
 	gpu-delay.c
 	crop-filter.c
