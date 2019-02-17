@@ -23,6 +23,10 @@ uniform float4x4 kernel_matrix;
 
 uniform float width_param;
 uniform float height_param;
+uniform float4x4 matrix_0;
+uniform float4x4 matrix_1;
+uniform float4x4 matrix_2;
+uniform float4x4 matrix_3;
 
 
 sampler_state textureSampler {
@@ -50,27 +54,31 @@ float4 PSColorFilterRGBA(VertData vert_in) : TARGET
     float hSize = 1.0/height_param;
 
 	//float4 pixelSum = (image.Sample(textureSampler, vert_in.uv));
-	float4 pixelSum = (image.Sample(textureSampler, vert_in.uv+float2(-hSize, -wSize)) + 
-                      image.Sample(textureSampler, vert_in.uv+float2(hSize, -wSize)) + 
-                      image.Sample(textureSampler, vert_in.uv+float2(-hSize, wSize)) +
-                      image.Sample(textureSampler, vert_in.uv+float2(hSize, wSize)))/4.0;
+	float4 pixelSum = float4(0.0);
+	//float4 pixelSum = (image.Sample(textureSampler, vert_in.uv+float2(-hSize, -wSize)) + 
+    //                  image.Sample(textureSampler, vert_in.uv+float2(hSize, -wSize)) + 
+    //                  image.Sample(textureSampler, vert_in.uv+float2(-hSize, wSize)) +
+    //                  image.Sample(textureSampler, vert_in.uv+float2(hSize, wSize)))/4.0;
 
-    
+   
+    float a = matrix_0[0][0]; 
 
    // float4 pixelSum = float4(1);
     
-    /*for(int i = 0; i < 3; i++)
+    float weightSum = 0.0;
+    for(int i = -2; i < 3; i++)
     {
-        for(int j = 0; j < 3; j++)
+        for(int j = -2; j < 3; j++)
         {
-*/
-  //          pixelSum += image.Sample(textureSampler, vert_in.uv+float2(hSize*1, wSize*1))
-/*
+            //if(i == 0 || j == 0)
+            //    continue;
+            pixelSum += image.Sample(textureSampler, vert_in.uv+float2(hSize*i, wSize*j))*(a);
+            
         }
 
     }
-    */
-    //pixelSum = pixelSum / 25.0;
+    
+    pixelSum = pixelSum / 25.0;
 	return pixelSum;
 }
 

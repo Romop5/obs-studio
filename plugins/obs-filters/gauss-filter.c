@@ -30,8 +30,10 @@ struct gauss_filter_data {
 	gs_eparam_t                    *width_param;
 	gs_eparam_t                    *height_param;
 	gs_eparam_t                    *kernel_param;
+	gs_eparam_t                    *custom_param;
     struct matrix4                  kernel_matrix;
     float                           strength;
+    float                           customMatrix[25];
 };
 
 /* Calculate Gauss coefficient at (x,y) with sigma 
@@ -50,6 +52,12 @@ void constructKernel(struct matrix4* out_matrix, float sigma_parameter)
 		gaussCoefficientAt(-2,1,sigma_parameter), gaussCoefficientAt(-1,1,sigma_parameter), gaussCoefficientAt(1,1,sigma_parameter), gaussCoefficientAt(2,1,sigma_parameter),
 		gaussCoefficientAt(-2,2,sigma_parameter), gaussCoefficientAt(-1,2,sigma_parameter), gaussCoefficientAt(1,2,sigma_parameter), gaussCoefficientAt(2,2,sigma_parameter)
 	};
+
+    blog(LOG_INFO, "Constructing matrix for sigma: %f\n",sigma_parameter);
+    blog(LOG_INFO, "\t%f %f %f %f\n",out_matrix->x.x, out_matrix->x.y, out_matrix->x.z, out_matrix->x.w);
+    blog(LOG_INFO, "\t%f %f %f %f\n",out_matrix->y.x, out_matrix->y.y, out_matrix->y.z, out_matrix->y.w);
+    blog(LOG_INFO, "\t%f %f %f %f\n",out_matrix->z.x, out_matrix->z.y, out_matrix->z.z, out_matrix->z.w);
+    //blog(LOG_INFO, "\t%f %f %f %f\n",out_matrix->w.x, out_matrix->w.y, out_matrix->w.z, out_matrix->w.w);
 }
 
 
@@ -79,6 +87,12 @@ static void gauss_filter_update(void *data, obs_data_t *settings)
 
     constructKernel(&filter->kernel_matrix, filter->strength);
 	gs_effect_set_matrix4(filter->kernel_param, &filter->kernel_matrix);
+
+    for(int i = 0; i < 25; i++)
+    {
+        filter->customMatrix[i] = gaussCoefficientAt(0, i, filter->strength);
+    }
+	gs_effect_set_val(filter->custom_param, filter->customMatrix, sizeof(float)*25);
 
 }
 
@@ -144,6 +158,8 @@ static void *gauss_filter_create(obs_data_t *settings,
                 
 		filter->kernel_param = gs_effect_get_param_by_name(
 				filter->effect, "kernel_matrix");
+		filter->custom_param = gs_effect_get_param_by_name(
+				filter->effect, "customMatrix");
 	} else {
         blog(LOG_ERROR, "Failed to load gauss effect shader: %s\n",errorString);
     }
@@ -182,19 +198,20 @@ static void gauss_filter_render(void *data, gs_effect_t *effect)
 
 	/* Now pass the interface variables to the .effect file. */
 	gs_effect_set_float(filter->strength_param, filter->strength);
-    constructKernel(&filter->kernel_matrix, filter->strength);
+    //constructKernel(&filter->kernel_matrix, filter->strength);
 	//gs_effect_set_matrix4(filter->kernel_param, &filter->kernel_matrix);
 
-	/*float width = (float)obs_source_get_width(
+	float width = (float)obs_source_get_width(
 			obs_filter_get_target(filter->context));
 	float height = (float)obs_source_get_height(
 			obs_filter_get_target(filter->context));
 	gs_effect_set_float(filter->width_param, width);
 	gs_effect_set_float(filter->height_param, height);
-    */
-
+    
+    /*
 	gs_effect_set_float(filter->width_param, 1000.0);
 	gs_effect_set_float(filter->height_param, 1000.0);
+    */
 
 	obs_source_process_filter_end(filter->context, filter->effect, 0, 0);
 
@@ -212,7 +229,7 @@ static obs_properties_t *gauss_filter_properties(void *data)
 	obs_properties_t *props = obs_properties_create();
 
 	obs_properties_add_float_slider(props, SETTING_STRENGTH,
-			TEXT_STRENGTH, 0.1, 0.5, 0.001);
+			TEXT_STRENGTH, 0.1, 5.0, 0.001);
 
 	UNUSED_PARAMETER(data);
 	return props;
@@ -227,7 +244,7 @@ static obs_properties_t *gauss_filter_properties(void *data)
  */
 static void gauss_filter_defaults(obs_data_t *settings)
 {
-	obs_data_set_default_double(settings, SETTING_STRENGTH, 0.1);
+	obs_data_set_default_double(settings, SETTING_STRENGTH, 1.0);
 }
 
 /*
