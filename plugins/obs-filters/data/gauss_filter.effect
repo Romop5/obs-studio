@@ -48,6 +48,21 @@ VertData VSDefault(VertData vert_in)
 	return vert_out;
 }
 
+float getMatrix(int row, int col)
+{
+    int r = row%4;
+    int c = col%4;
+    if(row < 4)
+    {
+        if(col < 4)
+            return matrix_0[r][c];
+        return matrix_1[r][c];
+    }
+    if(col < 4)
+        return matrix_2[r][c];
+    return matrix_3[r][c];
+}
+
 float4 PSColorFilterRGBA(VertData vert_in) : TARGET
 {
     float wSize = 1.0/width_param;
@@ -61,24 +76,24 @@ float4 PSColorFilterRGBA(VertData vert_in) : TARGET
     //                  image.Sample(textureSampler, vert_in.uv+float2(hSize, wSize)))/4.0;
 
    
-    float a = matrix_0[0][0]; 
+    float a = getMatrix(0,4); 
 
    // float4 pixelSum = float4(1);
     
     float weightSum = 0.0;
-    for(int i = -2; i < 3; i++)
+    for(int i = -3; i <= 3; i++)
     {
-        for(int j = -2; j < 3; j++)
+        for(int j = -3; j <= 3; j++)
         {
-            //if(i == 0 || j == 0)
-            //    continue;
-            pixelSum += image.Sample(textureSampler, vert_in.uv+float2(hSize*i, wSize*j))*(a);
-            
+            float sample = getMatrix(i+3, j+3); 
+            weightSum += sample;
+            pixelSum += image.Sample(textureSampler, vert_in.uv+float2(hSize*j, wSize*i))*sample;
         }
 
     }
     
-    pixelSum = pixelSum / 25.0;
+    //pixelSum = pixelSum / 25.0;
+    pixelSum = pixelSum / weightSum; 
 	return pixelSum;
 }
 
