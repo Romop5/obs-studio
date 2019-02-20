@@ -15,6 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *****************************************************************************/
 
+#define INTERVAL_SIZE 30
+
 uniform float4x4 ViewProj;
 uniform texture2d image;
 
@@ -47,6 +49,15 @@ VertData VSDefault(VertData vert_in)
 	vert_out.uv = vert_in.uv;
 	return vert_out;
 }
+
+/* Calculate Gauss coefficient at (x,y) with sigma 
+ * Algorithm taken from https://homepages.inf.ed.ac.uk/rbf/HIPR2/gsmooth.htm */
+float gaussCoefficientAt(float x, float y, float sigma)
+{
+    return (1.0/2.0*3.1415*sigma*sigma)*exp(-(x*x+y*y)/(2*sigma*sigma));
+}
+
+
 
 float getMatrix(int row, int col)
 {
@@ -81,13 +92,19 @@ float4 PSColorFilterRGBA(VertData vert_in) : TARGET
    // float4 pixelSum = float4(1);
     
     float weightSum = 0.0;
-    for(int i = -3; i <= 3; i++)
+    for(int i = 0; i <= INTERVAL_SIZE; i++)
     {
-        for(int j = -3; j <= 3; j++)
+        for(int j = 0; j <= INTERVAL_SIZE; j++)
         {
-            float sample = getMatrix(i+3, j+3); 
-            weightSum += sample;
-            pixelSum += image.Sample(textureSampler, vert_in.uv+float2(hSize*j, wSize*i))*sample;
+            float sample = 1.0;
+            //float sample = getMatrix(i+3, j+3); 
+            //float sample = gaussCoefficientAt(i, j,strength); 
+
+            weightSum += sample*4.0;
+            pixelSum += image.Sample(textureSampler, vert_in.uv+float2(hSize*j, wSize*i))*sample
+            + image.Sample(textureSampler, vert_in.uv+float2(hSize*-j, wSize*i))*sample
+            + image.Sample(textureSampler, vert_in.uv+float2(hSize*-j, wSize*-i))*sample
+            + image.Sample(textureSampler, vert_in.uv+float2(hSize*j, wSize*-i))*sample;
         }
 
     }
