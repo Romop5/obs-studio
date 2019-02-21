@@ -15,6 +15,7 @@ extern struct obs_source_info color_filter;
 extern struct obs_source_info color_inverse_filter;
 extern struct obs_source_info pixelize_filter;
 extern struct obs_source_info gauss_filter;
+extern struct obs_source_info edge_detection_filter;
 extern struct obs_source_info scale_filter;
 extern struct obs_source_info scroll_filter;
 extern struct obs_source_info gpu_delay_filter;
@@ -41,6 +42,7 @@ bool obs_module_load(void)
 	obs_register_source(&color_inverse_filter);
 	obs_register_source(&pixelize_filter);
 	obs_register_source(&gauss_filter);
+	obs_register_source(&edge_detection_filter);
 	obs_register_source(&scale_filter);
 	obs_register_source(&scroll_filter);
 	obs_register_source(&gpu_delay_filter);

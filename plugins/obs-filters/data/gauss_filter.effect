@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *****************************************************************************/
 
-#define INTERVAL_SIZE 30
+#define INTERVAL_SIZE 10
 
 uniform float4x4 ViewProj;
 uniform texture2d image;
@@ -96,9 +96,9 @@ float4 PSColorFilterRGBA(VertData vert_in) : TARGET
     {
         for(int j = 0; j <= INTERVAL_SIZE; j++)
         {
-            float sample = 1.0;
+            //float sample = 1.0;
             //float sample = getMatrix(i+3, j+3); 
-            //float sample = gaussCoefficientAt(i, j,strength); 
+            float sample = gaussCoefficientAt(i, j,strength); 
 
             weightSum += sample*4.0;
             pixelSum += image.Sample(textureSampler, vert_in.uv+float2(hSize*j, wSize*i))*sample

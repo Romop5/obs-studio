@@ -144,7 +144,7 @@ static void pixelize_filter_render(void *data, gs_effect_t *effect)
 		return;
 
 	/* Now pass the interface variables to the .effect file. */
-	gs_effect_set_float(filter->strength_param, filter->strength);
+	gs_effect_set_float(filter->strength_param, filter->strength*(1.0/2048));
 
 	obs_source_process_filter_end(filter->context, filter->effect, 0, 0);
 
@@ -159,10 +159,11 @@ static void pixelize_filter_render(void *data, gs_effect_t *effect)
  */
 static obs_properties_t *pixelize_filter_properties(void *data)
 {
+
 	obs_properties_t *props = obs_properties_create();
 
 	obs_properties_add_float_slider(props, SETTING_STRENGTH,
-			TEXT_STRENGTH, 0.1, 0.5, 0.001);
+			TEXT_STRENGTH, 1.0, 100, 1.0);
 
 	UNUSED_PARAMETER(data);
 	return props;
@@ -177,7 +178,7 @@ static obs_properties_t *pixelize_filter_properties(void *data)
  */
 static void pixelize_filter_defaults(obs_data_t *settings)
 {
-	obs_data_set_default_double(settings, SETTING_STRENGTH, 0.1);
+	obs_data_set_default_double(settings, SETTING_STRENGTH, 1.0);
 }
 
 /*

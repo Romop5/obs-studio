@@ -20,28 +20,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 
 
-#define SETTING_STRENGTH                  "strength"
+#define SETTING_THRESHOLD                  "threshold"
 
-#define TEXT_STRENGTH                     obs_module_text("Strength")
+#define TEXT_THRESHOLD                     obs_module_text("Threshold")
 
-struct gauss_filter_data {
-	obs_source_t                   *context;
-	gs_effect_t                    *effect;
-	gs_eparam_t                    *strength_param;
-	gs_eparam_t                    *width_param;
-	gs_eparam_t                    *height_param;
-	gs_eparam_t                    *kernel_param;
-	gs_eparam_t                    *custom_param;
-	gs_eparam_t                    *matrix_0_param;
-	gs_eparam_t                    *matrix_1_param;
-	gs_eparam_t                    *matrix_2_param;
-	gs_eparam_t                    *matrix_3_param;
-    struct matrix4                  kernel_matrix;
-    float                           strength;
-    float                           customMatrix[25];
+static struct matrix4 oneMatrix = {
+    1.0,1.0,1.0,0.0,
+    1.0,0.0,1.0,0.0,
+    1.0,1.0,1.0,0.0,
+    0.0,0.0,0.0,0.0,
+};
+static struct matrix4 sobelHorizontal = {
+    -1.0, 0.0, 1.0,0.0, 
+    -2.0, 0.0, 2.0,0.0, 
+    -1.0, 0.0, 1.0,0.0, 
+    0.0, 0.0, 0.0,0.0 
 };
 
-void matrix4_print(struct matrix4 m)
+static struct matrix4 sobelVertical = {
+    -1.0, -2.0, -1.0,0, 
+     0.0,  1.0,  0.0,0, 
+     1.0,  2.0,  1.0,0, 
+     0,    0,    0,  0 
+};
+
+
+
+struct edge_detection_filter_data {
+	obs_source_t                   *context;
+	gs_effect_t                    *effect;
+	gs_eparam_t                    *threshold_param;
+
+	gs_eparam_t                    *width_param;
+	gs_eparam_t                    *height_param;
+
+	gs_eparam_t                    *sobel_horizontal_param;
+	gs_eparam_t                    *sobel_vertical_param;
+};
+
+extern void matrix4_print(struct matrix4 m);
+/*void matrix4_print(struct matrix4 m)
 {
     blog(LOG_INFO, "matrix4_print()");
     for(int row = 0; row < 4; row++)
@@ -65,45 +83,16 @@ void matrix4_print(struct matrix4 m)
         blog(LOG_INFO, line);
     }
 }
-
-/* Calculate Gauss coefficient at (x,y) with sigma 
- * Algorithm taken from https://homepages.inf.ed.ac.uk/rbf/HIPR2/gsmooth.htm */
-float gaussCoefficientAt(float x, float y, float sigma)
-{
-    return (1.0/2.0*M_PI*sigma*sigma)*exp(-(x*x+y*y)/(2*sigma*sigma));
-}
-
-void constructKernel(struct matrix4 out_matrix[4], float sigma_parameter)
-{
-    for(int x = 0; x < 8; x++)
-    {
-        for(int y = 0; y < 8; y++)
-        {
-           int matrixID = (y < 4)?((x < 4)?0:1):((x < 4)?2:3);
-           struct vec4* vectorPtr = NULL;
-           switch(x % 4)
-           {
-               case 0: vectorPtr = &out_matrix[matrixID].x; break;
-               case 1: vectorPtr = &out_matrix[matrixID].y; break;
-               case 2: vectorPtr = &out_matrix[matrixID].z; break;
-               case 3: vectorPtr = &out_matrix[matrixID].t; break;
-           }
-           int collumnID= y % 4;
-           vectorPtr->ptr[collumnID] = gaussCoefficientAt(x-3, y-3,sigma_parameter);
-        }
-
-    }
-}
-
+*/
 
 /*
  * As the functions' namesake, this provides the internal name of your Filter,
  * which is then translated/referenced in the "data/locale" files.
  */
-static const char *gauss_filter_name(void *unused)
+static const char *edge_detection_filter_name(void *unused)
 {
 	UNUSED_PARAMETER(unused);
-	return obs_module_text("Gauss filter");
+	return obs_module_text("Edge detection");
 }
 
 /*
@@ -112,49 +101,16 @@ static const char *gauss_filter_name(void *unused)
  * with a slider this function is called to update the internal settings
  * in OBS, and hence the settings being passed to the CPU/GPU.
  */
-static void gauss_filter_update(void *data, obs_data_t *settings)
+static void edge_detection_filter_update(void *data, obs_data_t *settings)
 {
-	struct gauss_filter_data *filter = data;
+	struct edge_detection_filter_data *filter = data;
 
-	/* Build our Gamma numbers. */
-	double gamma = obs_data_get_double(settings, SETTING_STRENGTH);
-	filter->strength = gamma;
+	double threshold = obs_data_get_double(settings, SETTING_THRESHOLD);
 
-    struct matrix4 m[4];
-    constructKernel(m, filter->strength);
 
-    matrix4_print(m[0]);
-    matrix4_print(m[1]);
-    matrix4_print(m[2]);
-    matrix4_print(m[3]);
-
-    for(int y = -3; y < 4; y++)
-    {
-        char line[255];
-        line[0] = '\0';
-        for(int x = -3; x < 4; x++)
-        {   
-            char number[15];
-            sprintf(number,"%f ",gaussCoefficientAt(y, x, filter->strength));
-            strcat(line,number);
-
-        }
-        blog(LOG_INFO,"%s",line);
-
-    }
-
-	gs_effect_set_matrix4(filter->matrix_0_param, &m[0]);
-	gs_effect_set_matrix4(filter->matrix_1_param, &m[1]);
-	gs_effect_set_matrix4(filter->matrix_2_param, &m[2]);
-	gs_effect_set_matrix4(filter->matrix_3_param, &m[3]);
-	gs_effect_set_matrix4(filter->kernel_param, &filter->kernel_matrix);
-
-    for(int i = 0; i < 25; i++)
-    {
-        filter->customMatrix[i] = gaussCoefficientAt(0, i, filter->strength);
-    }
-	gs_effect_set_val(filter->custom_param, filter->customMatrix, sizeof(float)*25);
-
+    gs_effect_set_float(filter->threshold_param, threshold);
+    gs_effect_set_matrix4(filter->sobel_horizontal_param, &sobelHorizontal);
+    gs_effect_set_matrix4(filter->sobel_vertical_param, &sobelVertical);
 }
 
 /*
@@ -162,9 +118,9 @@ static void gauss_filter_update(void *data, obs_data_t *settings)
  * OBS. Jim has added several useful functions to help keep memory leaks to
  * a minimum, and handle the destruction and construction of these filters.
  */
-static void gauss_filter_destroy(void *data)
+static void edge_detection_filter_destroy(void *data)
 {
-	struct gauss_filter_data *filter = data;
+	struct edge_detection_filter_data *filter = data;
 
 	if (filter->effect) {
 		obs_enter_graphics();
@@ -181,7 +137,7 @@ static void gauss_filter_destroy(void *data)
  * filter, it also calls the render function (farther below) that contains the
  * actual rendering code.
  */
-static void *gauss_filter_create(obs_data_t *settings,
+static void *edge_detection_filter_create(obs_data_t *settings,
 	obs_source_t *context)
 {
 	/*
@@ -190,14 +146,14 @@ static void *gauss_filter_create(obs_data_t *settings,
 	* function calculates the size needed and allocates memory to
 	* handle the source.
 	*/
-	struct gauss_filter_data *filter =
-		bzalloc(sizeof(struct gauss_filter_data));
+	struct edge_detection_filter_data *filter =
+		bzalloc(sizeof(struct edge_detection_filter_data));
 
 	/*
 	 * By default the effect file is stored in the ./data directory that
 	 * your filter resides in.
 	 */
-	char *effect_path = obs_module_file("gauss_filter.effect");
+	char *effect_path = obs_module_file("edge_detection_filter.effect");
 
 	filter->context = context;
 
@@ -210,27 +166,30 @@ static void *gauss_filter_create(obs_data_t *settings,
 
 	/* If the filter is active pass the parameters to the filter. */
 	if (filter->effect) {
-		filter->strength_param = gs_effect_get_param_by_name(
-				filter->effect, SETTING_STRENGTH);
-		filter->width_param = gs_effect_get_param_by_name(
+		filter->threshold_param = gs_effect_get_param_by_name(
+				filter->effect, SETTING_THRESHOLD);
+		filter->width_param= gs_effect_get_param_by_name(
 				filter->effect, "width_param");
 		filter->height_param = gs_effect_get_param_by_name(
 				filter->effect, "height_param");
-                
-		filter->kernel_param = gs_effect_get_param_by_name(
-				filter->effect, "kernel_matrix");
-		filter->custom_param = gs_effect_get_param_by_name(
-				filter->effect, "customMatrix");
-		filter->matrix_0_param = gs_effect_get_param_by_name(
-				filter->effect, "matrix_0");
-		filter->matrix_1_param = gs_effect_get_param_by_name(
-				filter->effect, "matrix_1");
-		filter->matrix_2_param = gs_effect_get_param_by_name(
-				filter->effect, "matrix_2");
-		filter->matrix_3_param = gs_effect_get_param_by_name(
-				filter->effect, "matrix_3");
+		filter->sobel_horizontal_param = gs_effect_get_param_by_name(
+				filter->effect, "sobel_horizontal");
+		filter->sobel_vertical_param = gs_effect_get_param_by_name(
+				filter->effect, "sobel_vertical");
+
+        gs_effect_set_matrix4(filter->sobel_horizontal_param, &oneMatrix);
+        gs_effect_set_matrix4(filter->sobel_vertical_param, &oneMatrix);
+
+        /*
+        gs_effect_set_matrix4(filter->sobel_horizontal_param, &sobelHorizontal);
+        gs_effect_set_matrix4(filter->sobel_vertical_param, &sobelVertical);
+        */
+        matrix4_print(sobelHorizontal);
+        matrix4_print(sobelVertical);
+
+
 	} else {
-        blog(LOG_ERROR, "Failed to load gauss effect shader: %s\n",errorString);
+        blog(LOG_ERROR, "Failed to load edge detection effect shader: %s\n",errorString);
     }
 
 	obs_leave_graphics();
@@ -243,7 +202,7 @@ static void *gauss_filter_create(obs_data_t *settings,
 	 * values that don't exist anymore.
 	 */
 	if (!filter->effect) {
-		gauss_filter_destroy(filter);
+		edge_detection_filter_destroy(filter);
 		return NULL;
 	}
 
@@ -252,21 +211,21 @@ static void *gauss_filter_create(obs_data_t *settings,
 	 * we could end up with the user controlled sliders and values
 	 * updating, but the visuals not updating to match.
 	 */
-	gauss_filter_update(filter, settings);
+	edge_detection_filter_update(filter, settings);
 	return filter;
 }
 
 /* This is where the actual rendering of the filter takes place. */
-static void gauss_filter_render(void *data, gs_effect_t *effect)
+static void edge_detection_filter_render(void *data, gs_effect_t *effect)
 {
-	struct gauss_filter_data *filter = data;
+	struct edge_detection_filter_data *filter = data;
 
 	if (!obs_source_process_filter_begin(filter->context, GS_RGBA,
 			OBS_ALLOW_DIRECT_RENDERING))
 		return;
 
 	/* Now pass the interface variables to the .effect file. */
-	gs_effect_set_float(filter->strength_param, filter->strength);
+	//gs_effect_set_float(filter->threshold_param, filter->strength);
     //constructKernel(&filter->kernel_matrix, filter->strength);
 	//gs_effect_set_matrix4(filter->kernel_param, &filter->kernel_matrix);
 
@@ -276,11 +235,11 @@ static void gauss_filter_render(void *data, gs_effect_t *effect)
 			obs_filter_get_target(filter->context));
 	gs_effect_set_float(filter->width_param, width);
 	gs_effect_set_float(filter->height_param, height);
+
+
+    gs_effect_set_matrix4(filter->sobel_horizontal_param, &sobelHorizontal);
+    gs_effect_set_matrix4(filter->sobel_vertical_param, &sobelVertical);
     
-    /*
-	gs_effect_set_float(filter->width_param, 1000.0);
-	gs_effect_set_float(filter->height_param, 1000.0);
-    */
 
 	obs_source_process_filter_end(filter->context, filter->effect, 0, 0);
 
@@ -293,12 +252,12 @@ static void gauss_filter_render(void *data, gs_effect_t *effect)
  * maximum and step values. While a custom interface can be built, for a
  * simple filter like this it's better to use the supplied functions.
  */
-static obs_properties_t *gauss_filter_properties(void *data)
+static obs_properties_t *edge_detection_filter_properties(void *data)
 {
 	obs_properties_t *props = obs_properties_create();
 
-	obs_properties_add_float_slider(props, SETTING_STRENGTH,
-			TEXT_STRENGTH, 0.1, 20.0, 0.001);
+	obs_properties_add_float_slider(props, SETTING_THRESHOLD,
+			TEXT_THRESHOLD, 0.0, 0.5, 0.001);
 
 	UNUSED_PARAMETER(data);
 	return props;
@@ -311,9 +270,9 @@ static obs_properties_t *gauss_filter_properties(void *data)
  * *NOTE* this function is completely optional, as is providing a default
  * for any particular setting.
  */
-static void gauss_filter_defaults(obs_data_t *settings)
+static void edge_detection_filter_defaults(obs_data_t *settings)
 {
-	obs_data_set_default_double(settings, SETTING_STRENGTH, 1.0);
+	obs_data_set_default_double(settings, SETTING_THRESHOLD, 1.0);
 }
 
 /*
@@ -326,15 +285,15 @@ static void gauss_filter_defaults(obs_data_t *settings)
  * variable name in it? While not mandatory, it helps a ton for you (and those
  * reading your code) to follow this convention.
  */
-struct obs_source_info gauss_filter = {
-	.id = "gauss_filter",
+struct obs_source_info edge_detection_filter = {
+	.id = "edge_detection_filter",
 	.type = OBS_SOURCE_TYPE_FILTER,
 	.output_flags = OBS_SOURCE_VIDEO,
-	.get_name = gauss_filter_name,
-	.create = gauss_filter_create,
-	.destroy = gauss_filter_destroy,
-	.video_render = gauss_filter_render,
-	.update = gauss_filter_update,
-	.get_properties = gauss_filter_properties,
-	.get_defaults = gauss_filter_defaults
+	.get_name = edge_detection_filter_name,
+	.create = edge_detection_filter_create,
+	.destroy = edge_detection_filter_destroy,
+	.video_render = edge_detection_filter_render,
+	.update = edge_detection_filter_update,
+	.get_properties = edge_detection_filter_properties,
+	.get_defaults = edge_detection_filter_defaults
 };

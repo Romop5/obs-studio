@@ -38,6 +38,7 @@ set(obs-filters_SOURCES
 	color-correction-filter.c
 	color-inverse.c
 	gauss-filter.c
+	edge-detection-filter.c
 	pixelize-filter.c
 	async-delay-filter.c
 	gpu-delay.c
