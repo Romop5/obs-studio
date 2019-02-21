@@ -19,24 +19,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <graphics/quat.h>
 
 
-#define SETTING_STRENGTH                  "strength"
+#define SETTING_SPEED                  "speed"
+#define SETTING_TIMESPEED               "timespeed"
+#define SETTING_TICKCOUNT               "tickcount"
 
-#define TEXT_STRENGTH                     obs_module_text("Strength")
+#define TEXT_SPEED                     obs_module_text("Cosine speed")
+#define TEXT_TIMESPEED                     obs_module_text("Time speed")
 
 struct radial_wave_filter_data {
 	obs_source_t                   *context;
 
 	gs_effect_t                    *effect;
 
-	gs_eparam_t                    *strength_param;
+	gs_eparam_t                    *speed_param;
+	gs_eparam_t                    *timespeed_param;
+	gs_eparam_t                    *tickcount_param;
 
-    float                           strength;
+    float                           speed;
+    int                             tickcount;
 };
 
-static const float root3 = 0.57735f;
-static const float red_weight = 0.299f;
-static const float green_weight = 0.587f;
-static const float blue_weight = 0.114f;
 
 /*
  * As the functions' namesake, this provides the internal name of your Filter,
@@ -58,9 +60,12 @@ static void radial_wave_filter_update(void *data, obs_data_t *settings)
 {
 	struct radial_wave_filter_data *filter = data;
 
-	/* Build our Gamma numbers. */
-	double gamma = obs_data_get_double(settings, SETTING_STRENGTH);
-	filter->strength = gamma;
+	/* Build our cos_speed numbers. */
+	double cos_speed = obs_data_get_double(settings, SETTING_SPEED);
+	filter->speed = cos_speed;
+	gs_effect_set_float(filter->speed_param, filter->speed);
+	double time_speed = obs_data_get_double(settings, SETTING_TIMESPEED);
+	gs_effect_set_float(filter->timespeed_param, time_speed);
 }
 
 /*
@@ -115,8 +120,14 @@ static void *radial_wave_filter_create(obs_data_t *settings,
 
 	/* If the filter is active pass the parameters to the filter. */
 	if (filter->effect) {
-		filter->strength_param = gs_effect_get_param_by_name(
-				filter->effect, SETTING_STRENGTH);
+		filter->speed_param = gs_effect_get_param_by_name(
+				filter->effect, SETTING_SPEED);
+
+		filter->timespeed_param = gs_effect_get_param_by_name(
+				filter->effect, SETTING_TIMESPEED);
+
+		filter->tickcount_param= gs_effect_get_param_by_name(
+				filter->effect, SETTING_TICKCOUNT);
 	}
 
 	obs_leave_graphics();
@@ -152,9 +163,12 @@ static void radial_wave_filter_render(void *data, gs_effect_t *effect)
 		return;
 
 	/* Now pass the interface variables to the .effect file. */
-	gs_effect_set_float(filter->strength_param, filter->strength);
+	//gs_effect_set_float(filter->speed_param, filter->speed);
 
 	obs_source_process_filter_end(filter->context, filter->effect, 0, 0);
+    
+    
+    gs_effect_set_int(filter->tickcount_param, filter->tickcount++);
 
 	UNUSED_PARAMETER(effect);
 }
@@ -169,8 +183,11 @@ static obs_properties_t *radial_wave_filter_properties(void *data)
 {
 	obs_properties_t *props = obs_properties_create();
 
-	obs_properties_add_float_slider(props, SETTING_STRENGTH,
-			TEXT_STRENGTH, 0.0, 1.0, 0.01);
+	obs_properties_add_float_slider(props, SETTING_SPEED,
+			TEXT_SPEED, 0.1, 100.0, 0.01);
+
+	obs_properties_add_float_slider(props, SETTING_TIMESPEED,
+			TEXT_TIMESPEED, 0.0,3.14/2.0, 0.01);
 
 	UNUSED_PARAMETER(data);
 	return props;
@@ -185,7 +202,7 @@ static obs_properties_t *radial_wave_filter_properties(void *data)
  */
 static void radial_wave_filter_defaults(obs_data_t *settings)
 {
-	obs_data_set_default_double(settings, SETTING_STRENGTH, 0.0);
+	obs_data_set_default_double(settings, SETTING_SPEED, 10.0);
 }
 
 /*

@@ -18,7 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 uniform float4x4 ViewProj;
 uniform texture2d image;
 
-uniform float strength;
+uniform float speed;
+uniform float timespeed;
+uniform int tickcount;
 
 
 sampler_state textureSampler {
@@ -43,9 +45,11 @@ VertData VSDefault(VertData vert_in)
 float4 PSColorFilterRGBA(VertData vert_in) : TARGET
 {
 	float2 centred_uv = vert_in.uv+float2(-0.5);
+	float distanceToCenter = sqrt(centred_uv.x*centred_uv.x+centred_uv.y*centred_uv.y);
 	/* Grab the current pixel to perform operations on. */
-	float4 currentPixel = image.Sample(textureSampler, vert_in.uv+cos(vert_in.uv*10.0)*0.1);
-    //currentPixel.rgb = lerp(currentPixel.rgb, 1.0 - currentPixel.rgb, strength);
+	//float4 currentPixel = image.Sample(textureSampler, vert_in.uv+cos(vert_in.uv*10.0)*0.1);
+	float4 currentPixel = image.Sample(textureSampler,
+            vert_in.uv+centred_uv*(cos(distanceToCenter*speed +  tickcount*timespeed)*0.1));
 	return currentPixel;
 }
 
