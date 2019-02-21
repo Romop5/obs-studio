@@ -37,6 +37,7 @@ set(obs-filters_SOURCES
 	obs-filters.c
 	color-correction-filter.c
 	color-inverse.c
+	radial-wave-filter.c
 	gauss-filter.c
 	edge-detection-filter.c
 	pixelize-filter.c

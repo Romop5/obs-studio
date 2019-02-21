@@ -13,6 +13,7 @@ extern struct obs_source_info crop_filter;
 extern struct obs_source_info gain_filter;
 extern struct obs_source_info color_filter;
 extern struct obs_source_info color_inverse_filter;
+extern struct obs_source_info radial_wave_filter;
 extern struct obs_source_info pixelize_filter;
 extern struct obs_source_info gauss_filter;
 extern struct obs_source_info edge_detection_filter;
@@ -40,6 +41,7 @@ bool obs_module_load(void)
 	obs_register_source(&gain_filter);
 	obs_register_source(&color_filter);
 	obs_register_source(&color_inverse_filter);
+	obs_register_source(&radial_wave_filter);
 	obs_register_source(&pixelize_filter);
 	obs_register_source(&gauss_filter);
 	obs_register_source(&edge_detection_filter);
