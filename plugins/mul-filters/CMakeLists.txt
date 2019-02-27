@@ -21,8 +21,9 @@ set(mul-filters_SOURCES
 add_library(mul-filters MODULE
 	${mul-filters_SOURCES}
 	${mul-filters_config_HEADERS}
+    )
 target_link_libraries(mul-filters
 	libobs
-	${mul-filters_PLATFORM_DEPS}
+    )
 
 install_obs_plugin_with_data(mul-filters data)

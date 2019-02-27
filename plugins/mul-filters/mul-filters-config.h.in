@@ -8,4 +8,3 @@
 #define FALSE 0
 #endif
 
-#define SPEEXDSP_ENABLED @LIBSPEEXDSP_FOUND@
