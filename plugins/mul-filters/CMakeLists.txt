@@ -9,6 +9,7 @@ include_directories(${LIBSPEEXDSP_INCLUDE_DIRS}
 	"${CMAKE_BINARY_DIR}/plugins/mul-filters/config")
 
 set(mul-filters_SOURCES
+    chromatic-aberration-filter.c
 	mul-filters.c
 	color-inverse.c
 	mirror-filter.c
