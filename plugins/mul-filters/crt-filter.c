@@ -20,27 +20,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #define SETTING_STRENGTH                  "strength"
+#define SETTING_DUTYCYCLE                 "dutyCycle"
+#define SETTING_TICKCOUNT                 "tickCount"
+#define SETTING_APARAM                    "a"
+#define SETTING_BPARAM                    "b"
 
 #define TEXT_STRENGTH                     obs_module_text("Strength")
+#define TEXT_DUTYCYCLE                    obs_module_text("Duty cycle")
+#define TEXT_A                            obs_module_text("Parameter A")
+#define TEXT_B                            obs_module_text("Parameter B")
 
-struct chromatic_aberration_filter_data {
+struct crt_filter_data {
 	obs_source_t                   *context;
 
 	gs_effect_t                    *effect;
 
 	gs_eparam_t                    *strength_param;
+	gs_eparam_t                    *dutyCycle_param;
+	gs_eparam_t                    *tickcount_param;
 
+	gs_eparam_t                    *a_param;
+	gs_eparam_t                    *b_param;
+
+    float                           aValue;
+    float                           bValue;
     float                           strength;
+    float                           dutyCycle;
+    int                             tickcount;
 };
 
 /*
  * As the functions' namesake, this provides the internal name of your Filter,
  * which is then translated/referenced in the "data/locale" files.
  */
-static const char *chromatic_aberration_filter_name(void *unused)
+static const char *crt_filter_name(void *unused)
 {
 	UNUSED_PARAMETER(unused);
-	return obs_module_text("Chromatic aberration");
+	return obs_module_text("CRT filter");
 }
 
 /*
@@ -49,13 +65,21 @@ static const char *chromatic_aberration_filter_name(void *unused)
  * with a slider this function is called to update the internal settings
  * in OBS, and hence the settings being passed to the CPU/GPU.
  */
-static void chromatic_aberration_filter_update(void *data, obs_data_t *settings)
+static void crt_filter_update(void *data, obs_data_t *settings)
 {
-	struct chromatic_aberration_filter_data *filter = data;
+	struct crt_filter_data *filter = data;
 
 	/* Build our Gamma numbers. */
 	double gamma = obs_data_get_double(settings, SETTING_STRENGTH);
 	filter->strength = gamma;
+	double dutyCycle = obs_data_get_double(settings, SETTING_DUTYCYCLE);
+	filter->dutyCycle = dutyCycle;
+
+	double aParam = obs_data_get_double(settings, SETTING_APARAM);
+	filter->aValue = aParam;
+
+	double bParam = obs_data_get_double(settings, SETTING_BPARAM);
+	filter->bValue = bParam;
 }
 
 /*
@@ -63,9 +87,9 @@ static void chromatic_aberration_filter_update(void *data, obs_data_t *settings)
  * OBS. Jim has added several useful functions to help keep memory leaks to
  * a minimum, and handle the destruction and construction of these filters.
  */
-static void chromatic_aberration_filter_destroy(void *data)
+static void crt_filter_destroy(void *data)
 {
-	struct chromatic_aberration_filter_data *filter = data;
+	struct crt_filter_data *filter = data;
 
 	if (filter->effect) {
 		obs_enter_graphics();
@@ -82,7 +106,7 @@ static void chromatic_aberration_filter_destroy(void *data)
  * filter, it also calls the render function (farther below) that contains the
  * actual rendering code.
  */
-static void *chromatic_aberration_filter_create(obs_data_t *settings,
+static void *crt_filter_create(obs_data_t *settings,
 	obs_source_t *context)
 {
 	/*
@@ -91,14 +115,16 @@ static void *chromatic_aberration_filter_create(obs_data_t *settings,
 	* function calculates the size needed and allocates memory to
 	* handle the source.
 	*/
-	struct chromatic_aberration_filter_data *filter =
-		bzalloc(sizeof(struct chromatic_aberration_filter_data));
+	struct crt_filter_data *filter =
+		bzalloc(sizeof(struct crt_filter_data));
+
+    filter->tickcount = 0;
 
 	/*
 	 * By default the effect file is stored in the ./data directory that
 	 * your filter resides in.
 	 */
-	char *effect_path = obs_module_file("chromatic_aberration_filter.effect");
+	char *effect_path = obs_module_file("crt_filter.effect");
 
 	filter->context = context;
 
@@ -112,6 +138,14 @@ static void *chromatic_aberration_filter_create(obs_data_t *settings,
 	if (filter->effect) {
 		filter->strength_param = gs_effect_get_param_by_name(
 				filter->effect, SETTING_STRENGTH);
+		filter->dutyCycle_param = gs_effect_get_param_by_name(
+				filter->effect, "dutyCycle");
+		filter->tickcount_param= gs_effect_get_param_by_name(
+				filter->effect, SETTING_TICKCOUNT);
+		filter->a_param = gs_effect_get_param_by_name(
+				filter->effect, SETTING_APARAM);
+		filter->b_param = gs_effect_get_param_by_name(
+				filter->effect, SETTING_BPARAM);
 	}
 
 	obs_leave_graphics();
@@ -124,7 +158,7 @@ static void *chromatic_aberration_filter_create(obs_data_t *settings,
 	 * values that don't exist anymore.
 	 */
 	if (!filter->effect) {
-		chromatic_aberration_filter_destroy(filter);
+		crt_filter_destroy(filter);
 		return NULL;
 	}
 
@@ -133,14 +167,14 @@ static void *chromatic_aberration_filter_create(obs_data_t *settings,
 	 * we could end up with the user controlled sliders and values
 	 * updating, but the visuals not updating to match.
 	 */
-	chromatic_aberration_filter_update(filter, settings);
+	crt_filter_update(filter, settings);
 	return filter;
 }
 
 /* This is where the actual rendering of the filter takes place. */
-static void chromatic_aberration_filter_render(void *data, gs_effect_t *effect)
+static void crt_filter_render(void *data, gs_effect_t *effect)
 {
-	struct chromatic_aberration_filter_data *filter = data;
+	struct crt_filter_data *filter = data;
 
 	if (!obs_source_process_filter_begin(filter->context, GS_RGBA,
 			OBS_ALLOW_DIRECT_RENDERING))
@@ -148,6 +182,11 @@ static void chromatic_aberration_filter_render(void *data, gs_effect_t *effect)
 
 	/* Now pass the interface variables to the .effect file. */
 	gs_effect_set_float(filter->strength_param, filter->strength);
+	gs_effect_set_float(filter->dutyCycle_param, filter->dutyCycle);
+    gs_effect_set_int(filter->tickcount_param, filter->tickcount++);
+
+	gs_effect_set_float(filter->a_param, filter->aValue);
+	gs_effect_set_float(filter->b_param, filter->bValue);
 
 	obs_source_process_filter_end(filter->context, filter->effect, 0, 0);
 
@@ -160,12 +199,21 @@ static void chromatic_aberration_filter_render(void *data, gs_effect_t *effect)
  * maximum and step values. While a custom interface can be built, for a
  * simple filter like this it's better to use the supplied functions.
  */
-static obs_properties_t *chromatic_aberration_filter_properties(void *data)
+static obs_properties_t *crt_filter_properties(void *data)
 {
 	obs_properties_t *props = obs_properties_create();
 
 	obs_properties_add_float_slider(props, SETTING_STRENGTH,
-			TEXT_STRENGTH, 0.0, 30.0, 0.01);
+			TEXT_STRENGTH, 0.0, 0.5, 0.01);
+
+	obs_properties_add_float_slider(props, SETTING_DUTYCYCLE,
+			TEXT_DUTYCYCLE, 0.0, 1.0, 0.01);
+
+	obs_properties_add_float_slider(props, SETTING_APARAM,
+			TEXT_A, 0.0, 500.0, 1.0);
+
+	obs_properties_add_float_slider(props, SETTING_BPARAM,
+			TEXT_B, 0.0, 1.0, 0.01);
 
 	UNUSED_PARAMETER(data);
 	return props;
@@ -178,9 +226,10 @@ static obs_properties_t *chromatic_aberration_filter_properties(void *data)
  * *NOTE* this function is completely optional, as is providing a default
  * for any particular setting.
  */
-static void chromatic_aberration_filter_defaults(obs_data_t *settings)
+static void crt_filter_defaults(obs_data_t *settings)
 {
-	obs_data_set_default_double(settings, SETTING_STRENGTH, 0.0);
+	obs_data_set_default_double(settings, SETTING_STRENGTH, 0.1);
+	obs_data_set_default_double(settings, SETTING_DUTYCYCLE, 0.5);
 }
 
 /*
@@ -193,15 +242,15 @@ static void chromatic_aberration_filter_defaults(obs_data_t *settings)
  * variable name in it? While not mandatory, it helps a ton for you (and those
  * reading your code) to follow this convention.
  */
-struct obs_source_info chromatic_aberration_filter = {
-	.id = "chromatic_aberration_filter",
+struct obs_source_info crt_filter = {
+	.id = "crt_filter",
 	.type = OBS_SOURCE_TYPE_FILTER,
 	.output_flags = OBS_SOURCE_VIDEO,
-	.get_name = chromatic_aberration_filter_name,
-	.create = chromatic_aberration_filter_create,
-	.destroy = chromatic_aberration_filter_destroy,
-	.video_render = chromatic_aberration_filter_render,
-	.update = chromatic_aberration_filter_update,
-	.get_properties = chromatic_aberration_filter_properties,
-	.get_defaults = chromatic_aberration_filter_defaults
+	.get_name = crt_filter_name,
+	.create = crt_filter_create,
+	.destroy = crt_filter_destroy,
+	.video_render = crt_filter_render,
+	.update = crt_filter_update,
+	.get_properties = crt_filter_properties,
+	.get_defaults = crt_filter_defaults
 };

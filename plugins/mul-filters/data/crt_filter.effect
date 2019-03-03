@@ -19,6 +19,11 @@ uniform float4x4 ViewProj;
 uniform texture2d image;
 
 uniform float strength;
+uniform float dutyCycle;
+uniform int tickCount;
+
+uniform float a;
+uniform float b;
 
 
 sampler_state textureSampler {
@@ -40,22 +45,17 @@ VertData VSDefault(VertData vert_in)
 	return vert_out;
 }
 
+float rectangleSignal(float parameter, float period, float dutyCycle)
+{
+    float booleanSignal = sign(mod(parameter, period)-(period*dutyCycle));
+    return booleanSignal;
+}
+
 float4 PSColorFilterRGBA(VertData vert_in) : TARGET
 {
-    // Set UV to center => (0,0) in the middle of image
-    float2 centerUV = vert_in.uv-float2(0.5);
-
-    // Calculate distance to center
-    float dist = distance(centerUV, float2(0.0,0.0));
-
-	float4 r = image.Sample(textureSampler, vert_in.uv+float2(0.001,0.001)*strength*dist);
-	float4 g = image.Sample(textureSampler, vert_in.uv+float2(0.002,0.002)*strength*dist);
-	float4 b = image.Sample(textureSampler, vert_in.uv+float2(0.003,0.003)*strength*dist);
 	/* Grab the current pixel to perform operations on. */
-	//float4 currentPixel = image.Sample(textureSampler, vert_in.uv);
-    //currentPixel.rgb = lerp(currentPixel.rgb, 1.0 - currentPixel.rgb, strength);
-	//float4 currentPixel = float4(1.0,0.0,0.0,1.0);
-    float4 currentPixel = float4(r.x,g.y,b.z, 1.0);
+	float4 currentPixel = image.Sample(textureSampler, vert_in.uv);
+    currentPixel.rgb = lerp(currentPixel.rgb, 1.0 - currentPixel.rgb, strength)*rectangleSignal(sin(vert_in.uv.x*a)*0.01+vert_in.uv.y-tickCount*0.01*b, strength,dutyCycle);
 	return currentPixel;
 }
 
