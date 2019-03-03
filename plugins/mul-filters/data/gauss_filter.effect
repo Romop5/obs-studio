@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *****************************************************************************/
 
-#define INTERVAL_SIZE 10
+#define INTERVAL_SIZE 2
 
 uniform float4x4 ViewProj;
 uniform texture2d image;
@@ -32,7 +32,7 @@ uniform float4x4 matrix_3;
 
 
 sampler_state textureSampler {
-	Filter   = Linear;
+	Filter   = Point;
 	AddressU = Clamp;
 	AddressV = Clamp;
 };

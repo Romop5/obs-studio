@@ -28,10 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define SETTING_XMATRIX                   "x_points"
 #define SETTING_YMATRIX                   "y_points"
 
+#define SETTING_NOISETYPE                 "noisetype"
+
 #define TEXT_STRENGTH                     obs_module_text("Strength")
 #define TEXT_DUTYCYCLE                    obs_module_text("Duty cycle")
 #define TEXT_A                            obs_module_text("Parameter A")
 #define TEXT_B                            obs_module_text("Parameter B")
+#define TEXT_NOISETYPE                    obs_module_text("Noise type")
 
 struct noise_generator_filter_data {
 	obs_source_t                   *context;
@@ -41,6 +44,9 @@ struct noise_generator_filter_data {
 	gs_eparam_t                    *strength_param;
 	gs_eparam_t                    *dutyCycle_param;
 	gs_eparam_t                    *tickcount_param;
+
+	gs_eparam_t                    *noisetype_param;
+
 
 	gs_eparam_t                    *a_param;
 	gs_eparam_t                    *b_param;
@@ -53,6 +59,7 @@ struct noise_generator_filter_data {
     float                           strength;
     float                           dutyCycle;
     int                             tickcount;
+    int                             noisetype;
 };
 
 /*
@@ -78,14 +85,18 @@ static void noise_generator_filter_update(void *data, obs_data_t *settings)
 	/* Build our Gamma numbers. */
 	double gamma = obs_data_get_double(settings, SETTING_STRENGTH);
 	filter->strength = gamma;
-	double dutyCycle = obs_data_get_double(settings, SETTING_DUTYCYCLE);
-	filter->dutyCycle = dutyCycle;
+	//double dutyCycle = obs_data_get_double(settings, SETTING_DUTYCYCLE);
+	//filter->dutyCycle = dutyCycle;
 
 	double aParam = obs_data_get_double(settings, SETTING_APARAM);
 	filter->aValue = aParam;
 
 	double bParam = obs_data_get_double(settings, SETTING_BPARAM);
 	filter->bValue = bParam;
+
+	int noiseType= obs_data_get_int(settings, SETTING_NOISETYPE);
+    filter->noisetype = noiseType;
+    //blog(LOG_INFO, "Noise type: %d\n", noiseType);
 }
 
 /*
@@ -157,6 +168,9 @@ static void *noise_generator_filter_create(obs_data_t *settings,
 				filter->effect, SETTING_XMATRIX);
 		filter->yMatrix_param = gs_effect_get_param_by_name(
 				filter->effect, SETTING_YMATRIX);
+
+		filter->noisetype_param = gs_effect_get_param_by_name(
+				filter->effect, SETTING_NOISETYPE);
 	}
 
 	obs_leave_graphics();
@@ -235,6 +249,8 @@ static void noise_generator_filter_render(void *data, gs_effect_t *effect)
     }
     counter++;
 
+    gs_effect_set_int(filter->noisetype_param, filter->noisetype);
+
 	obs_source_process_filter_end(filter->context, filter->effect, 0, 0);
 
 	UNUSED_PARAMETER(effect);
@@ -251,16 +267,20 @@ static obs_properties_t *noise_generator_filter_properties(void *data)
 	obs_properties_t *props = obs_properties_create();
 
 	obs_properties_add_float_slider(props, SETTING_STRENGTH,
-			TEXT_STRENGTH, 0.0, 0.5, 0.01);
+			TEXT_STRENGTH, 0.0, 1.0, 0.01);
 
-	obs_properties_add_float_slider(props, SETTING_DUTYCYCLE,
-			TEXT_DUTYCYCLE, 0.0, 1.0, 0.01);
+	//obs_properties_add_float_slider(props, SETTING_DUTYCYCLE,
+	//		TEXT_DUTYCYCLE, 0.0, 1.0, 0.01);
 
 	obs_properties_add_float_slider(props, SETTING_APARAM,
 			TEXT_A, 0.0, 10.0, 0.1);
 
 	obs_properties_add_float_slider(props, SETTING_BPARAM,
 			TEXT_B, 1.0, 100.0, 1.00);
+
+    obs_property_t* property = obs_properties_add_list(props, SETTING_NOISETYPE, TEXT_NOISETYPE, OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+    obs_property_list_add_int(property, "Worney structure (Voronoi-like)", 1);
+    obs_property_list_add_int(property, "TV Noise", 2);
 
 	UNUSED_PARAMETER(data);
 	return props;

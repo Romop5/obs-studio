@@ -30,6 +30,8 @@ uniform float b;
 uniform float4x4 x_points;
 uniform float4x4 y_points;
 
+uniform int noisetype;
+
 
 sampler_state textureSampler {
 	Filter   = Linear;
@@ -50,19 +52,17 @@ VertData VSDefault(VertData vert_in)
 	return vert_out;
 }
 
-float rectangleSignal(float parameter, float period, float dutyCycle)
-{
-    float booleanSignal = sign(mod(parameter, period)-(period*dutyCycle));
-    return booleanSignal;
-}
-
-float noiseAt(float2 position, float time)
-{
-    return distance(mod(float2(138117.0)*cos(position)+float2(time), 58731.0), float2(0.0))/(58731.0);
+// 2D TV Noise
+// https://thebookofshaders.com/10/
+float random (vec2 st) {
+    return fract(sin(dot(st.xy,
+                         vec2(12.9898,78.233)))*
+        43758.5453123);
 }
 
 float4 PSColorFilterRGBA(VertData vert_in) : TARGET
 {
+    // Worley_noise = find closest neighbour
     float2 closest = float2(50.0);
     for(int x = 0; x < 3; x++)
     for(int y = 0; y < 3; y++)
@@ -75,11 +75,14 @@ float4 PSColorFilterRGBA(VertData vert_in) : TARGET
     }
 
     float dst = 1.0-pow(1.0-distance(vert_in.uv, closest),a);
+    if(noisetype == 2) {
+        // Calculate TV noise
+        dst = random(vert_in.uv+float2(0.0,sin(tickCount)));
+    }
 
 	/* Grab the current pixel to perform operations on. */
 	float4 currentPixel = image.Sample(textureSampler, vert_in.uv);
-    //currentPixel.rgb = lerp(currentPixel.rgb, 1.0 - currentPixel.rgb, strength)*rectangleSignal(sin(vert_in.uv.x*a)*0.01+vert_in.uv.y-tickCount*0.01*b, strength,dutyCycle);
-    return lerp(currentPixel, float4(0.0), dst);
+    return lerp(currentPixel, float4(float3(dst),1.0), strength);
 	//return currentPixel;
 }
 
