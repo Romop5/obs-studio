@@ -1,0 +1,93 @@
+/*****************************************************************************
+Copyright (C) 2016 by c3r1c3 <c3r1c3@nevermindonline.com>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*****************************************************************************/
+
+// https://en.wikipedia.org/wiki/Worley_noise
+
+uniform float4x4 ViewProj;
+uniform texture2d image;
+
+uniform float strength;
+uniform float dutyCycle;
+uniform int tickCount;
+
+uniform float a;
+uniform float b;
+
+uniform float4x4 x_points;
+uniform float4x4 y_points;
+
+
+sampler_state textureSampler {
+	Filter   = Linear;
+	AddressU = Clamp;
+	AddressV = Clamp;
+};
+
+struct VertData {
+	float4 pos : POSITION;
+	float2 uv : TEXCOORD0;
+};
+
+VertData VSDefault(VertData vert_in)
+{
+	VertData vert_out;
+	vert_out.pos = mul(float4(vert_in.pos.xyz, 1.0), ViewProj);
+	vert_out.uv = vert_in.uv;
+	return vert_out;
+}
+
+float rectangleSignal(float parameter, float period, float dutyCycle)
+{
+    float booleanSignal = sign(mod(parameter, period)-(period*dutyCycle));
+    return booleanSignal;
+}
+
+float noiseAt(float2 position, float time)
+{
+    return distance(mod(float2(138117.0)*cos(position)+float2(time), 58731.0), float2(0.0))/(58731.0);
+}
+
+float4 PSColorFilterRGBA(VertData vert_in) : TARGET
+{
+    float2 closest = float2(50.0);
+    for(int x = 0; x < 3; x++)
+    for(int y = 0; y < 3; y++)
+    {
+       float2 newPoint = float2(x_points[x][y],y_points[x][y]);
+       if(distance(closest, vert_in.uv) >  distance(vert_in.uv, newPoint))
+       {
+            closest = newPoint;
+       }
+    }
+
+    float dst = 1.0-pow(1.0-distance(vert_in.uv, closest),a);
+
+	/* Grab the current pixel to perform operations on. */
+	float4 currentPixel = image.Sample(textureSampler, vert_in.uv);
+    //currentPixel.rgb = lerp(currentPixel.rgb, 1.0 - currentPixel.rgb, strength)*rectangleSignal(sin(vert_in.uv.x*a)*0.01+vert_in.uv.y-tickCount*0.01*b, strength,dutyCycle);
+    return lerp(currentPixel, float4(0.0), dst);
+	//return currentPixel;
+}
+
+technique Draw
+{
+	pass
+	{
+		vertex_shader = VSDefault(vert_in);
+		pixel_shader = PSColorFilterRGBA(vert_in);
+	}
+}

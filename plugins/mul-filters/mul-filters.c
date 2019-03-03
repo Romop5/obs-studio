@@ -16,6 +16,7 @@ extern struct obs_source_info radial_wave_filter;
 extern struct obs_source_info pixelize_filter;
 extern struct obs_source_info gauss_filter;
 extern struct obs_source_info edge_detection_filter;
+extern struct obs_source_info noise_generator_filter;
 
 bool obs_module_load(void)
 {
@@ -27,5 +28,6 @@ bool obs_module_load(void)
 	obs_register_source(&pixelize_filter);
 	obs_register_source(&gauss_filter);
 	obs_register_source(&edge_detection_filter);
+	obs_register_source(&noise_generator_filter);
 	return true;
 }

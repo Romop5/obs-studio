@@ -18,7 +18,8 @@ set(mul-filters_SOURCES
 	gauss-filter.c
 	edge-detection-filter.c
 	pixelize-filter.c
-	)
+	noise-generator-filter.c
+        )
 
 add_library(mul-filters MODULE
 	${mul-filters_SOURCES}
